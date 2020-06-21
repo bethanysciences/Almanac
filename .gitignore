@@ -1,6 +1,11 @@
 .DS_Store
-examples/.DS_Store
 .vscode
+examples/.DS_Store
+examples/AlmanacOled/.DS_Store
+examples/AlmanacOled/.vscode
+examples/AlmanacLed/.DS_Store
+examples/AlmanacLed/.vscode
+
 
 # Prerequisites
 *.d
