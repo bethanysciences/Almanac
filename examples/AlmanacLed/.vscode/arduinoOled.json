@@ -1,0 +1,7 @@
+{
+    "board": "arduino:samd:nano_33_iot",
+    "port": "/dev/tty.usbmodem1442201",
+    "programmer": "AVRISP mkII",
+    "sketch": "AlmanacLed.ino",
+    "output": "../build"
+}

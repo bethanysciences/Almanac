@@ -39,10 +39,10 @@
  *  
  *******************|*******************|*******************|******************/
 
-
+#include <Arduino.h>
 #include <RTClib.h>                         // version=1.8.0
 #include <SunEvent.h>                       // version=0.1.0
-#include "tides/TidelibClearwaterBeachGulfOfMexicoFlorida.h"
+#include "TidelibClearwaterBeachGulfOfMexicoFlorida.h"
 
 
 /*******************|*******************|*******************|*******************
@@ -75,8 +75,8 @@ float results;                              // needed to print tide height
 void setup() {
     asm(".global _printf_float");           // printf renders floats
 
-    Serial.begin(57600);
-    while (!Serial);                        // wait for serrial port to open
+    Serial.begin(115200);
+    //while (!Serial);                        // wait for serrial port to open
     
     if (! rtc.begin()) while (1);           // wait until RTC starts
     if (rtc.lostPower()) {                  // if module lost power reset time

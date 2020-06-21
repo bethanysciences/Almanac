@@ -1,0 +1,30 @@
+{
+    "configurations": [
+        {
+            "name": "Mac",
+            "includePath": [
+                "/Users/bobbysmith/Library/Arduino15/packages/arduino/tools/**",
+                "/Users/bobbysmith/Library/Arduino15/packages/arduino/hardware/samd/1.8.6/**",
+                "/Users/bobbysmith/Dropbox/Arduino/libraries",
+                "/Users/bobbysmith/Dropbox/Arduino/libraries/RTClib",
+                "/Users/bobbysmith/Dropbox/Arduino/libraries/SunEvents/src",
+                "/Users/bobbysmith/Dropbox/Arduino/libraries/U8g2/src"
+            ],
+            "forcedInclude": [
+                "/Users/bobbysmith/Library/Arduino15/packages/arduino/hardware/samd/1.8.6/cores/arduino/Arduino.h"
+            ],
+            "macFrameworkPath": [
+                "/System/Library/Frameworks",
+                "/Library/Frameworks"
+            ],
+            "intelliSenseMode": "clang-x64",
+            "compilerPath": "/usr/local/bin/gcc-9",
+            "cStandard": "c11",
+            "cppStandard": "gnu++14",
+            "defines": [
+                "USBCON"
+            ]
+        }
+    ],
+    "version": 4
+}
