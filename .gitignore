@@ -1,5 +1,5 @@
 .DS_Store
-.vscode
+/.vscode
 examples/.DS_Store
 examples/AlmanacOled/.DS_Store
 examples/AlmanacOled/.vscode
