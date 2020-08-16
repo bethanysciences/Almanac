@@ -1,4 +1,4 @@
-/*  TidelibClearwaterBeachGulfOfMexicoFlorida.cpp 
+/*  TidelibDelawareCityDelawareRiverDelaware.cpp 
  This source file contains a tide calculation function for the site listed
  below. This file and the associated header file should be placed in the
  Ardiuno/libraries/ directory inside a single folder.
@@ -16,11 +16,11 @@
  The predictions from this program should not be used for navigation
  and no accuracy or warranty is given or implied for these tide predictions.
  */
-#include <Arduino.h>
-#include <Wire.h>
-#include <avr/pgmspace.h>
+// #include <Arduino.h>
+// #include <Wire.h>
+// #include <avr/pgmspace.h>
 #include "RTClib.h" // https://github.com/millerlp/RTClib
-#include "TidelibClearwaterBeachGulfOfMexicoFlorida.h"
+#include "TidelibDelawareCityDelawareRiverDelaware.h"
 
 unsigned int YearIndx = 0; // Used to index rows in the Equilarg/Nodefactor arrays
 float currHours = 0;          // Elapsed hours since start of year
@@ -39,23 +39,23 @@ put new site values in here by hand.
 The Speed, Equilarg and Nodefactor arrays can all stay the same for any site.
 */
 
-// Selected station: Clearwater Beach, Gulf Of Mexico, Florida
-char stationID[] = "Clearwater Beach, Gulf Of Mexico, Florida";
-// Selection station ID number: 8726724
-const long stationIDnumber = 8726724;
+// Selected station: Delaware City, Delaware River, Delaware
+char stationID[] = "Delaware City, Delaware River, Delaware";
+// Selection station ID number: 8551762
+const long stationIDnumber = 8551762;
 // The 'datum' printed here is the difference between mean sea level and 
 // mean lower low water for the NOAA station. These two values can be 
 // found for NOAA tide reference stations on the tidesandcurrents.noaa.gov
 //  site under the datum page for each station.
-const float Datum = 1.48 ; // units in feet
+const float Datum = 2.96 ; // units in feet
 // Harmonic constant names: J1, K1, K2, L2, M1, M2, M3, M4, M6, M8, N2, 2N2, O1, OO1, P1, Q1, 2Q1, R2, S1, S2, S4, S6, T2, LDA2, MU2, NU2, RHO1, MK3, 2MK3, MN4, MS4, 2SM2, MF, MSF, MM, SA, SSA
 // These names match the NOAA names, except LDA2 here is LAM2 on NOAA's site
 typedef float PROGMEM prog_float_t; // Need to define this type before use
 // Amp is the amplitude of each of the harmonic constituents for this site
-const prog_float_t Amp[] PROGMEM = {0.033,0.518,0.089,0.023,0.023,0.807,0.01,0.03,0,0,0.151,0.016,0.495,0.016,0.174,0.105,0.016,0.003,0.043,0.315,0,0,0.023,0.007,0,0.033,0.016,0.01,0.013,0.016,0.02,0,0,0,0,0.299,0.121};
+const prog_float_t Amp[] PROGMEM = {0.023,0.312,0.095,0.341,0.016,2.441,0.023,0.197,0.108,0.02,0.472,0.046,0.223,0.013,0.112,0.03,0.016,0.007,0.085,0.328,0.007,0.003,0.033,0.062,0.102,0.121,0.02,0.052,0.062,0.089,0.059,0.007,0,0,0,0.44,0.135};
 // Kappa is the 'modified' or 'adapted' phase lag (Epoch) of each of the 
 // harmonic constituents for this site.
-const prog_float_t Kappa[] PROGMEM = {20.8,12.4,134.6,143.1,15.7,123.1,298.6,76,0,0,120.3,110.1,3.6,4.7,12.5,348,340.8,141.7,93.8,141,0,0,119.1,131.4,0,121.6,341.8,331.7,309,51,90.5,0,0,0,0,151.9,48.2};
+const prog_float_t Kappa[] PROGMEM = {332,247.4,149,127.7,282.3,114.1,174.2,147.4,60,68.6,99.2,122.4,226.2,215.5,246.1,236.5,199.2,258.3,191.4,148,133.1,132,155.1,118.9,228.3,91.2,239.7,237.8,197.5,127.1,189.7,322.8,0,0,0,144.5,31.3};
 // Speed is the frequency of the constituent, denoted as little 'a' by Hicks 2006
 const prog_float_t Speed[] PROGMEM = {15.58544,15.04107,30.08214,29.52848,14.49669,28.9841,43.47616,57.96821,86.95231,115.9364,28.43973,27.89535,13.94304,16.1391,14.95893,13.39866,12.85429,30.04107,15,30,60,90,29.95893,29.45563,27.96821,28.51258,13.47151,44.02517,42.92714,57.42383,58.9841,31.0159,1.098033,1.015896,0.5443747,0.0410686,0.0821373};
 const prog_float_t Equilarg[10][37] PROGMEM = { 

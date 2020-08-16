@@ -1,38 +1,18 @@
+// tide library for station name IndianRiverDelaware
 #include "RTClib.h"
-#include "TidelibClearwaterBeachGulfOfMexicoFlorida.h"
+#include "tides.h"
 
-unsigned int YearIndx = 0;          // Used to index rows in the Equilarg/Nodefactor arrays
-float currHours = 0;                // Elapsed hours since start of year
-const int adjustGMT = 5;            // Time zone adjustment to get time in GMT.
-
-/* Initialize harmonic constituent array each holding 37 values for the tide site extracted using R scripts:
-    tide_harmonics_parse.R and tide_harmonics_library_generator.R
-    Values available from http://tidesandcurrent.noaa.gov
-    Kappa is referred to as 'Phase' NOAA's site.
-    Constituent order does not match NOAA's order, rearrange values to add new sites
-    Speed, Equilarg and Nodefactor arrays can all stay the same for any site
-*/
-
-char stationID[] = "Clearwater Beach, Florida";
-const long stationIDnumber = 8726724;
-const float Datum = 1.48;
-int harmoniConstants = 37;
-
-// Harmonic constant names: J1, K1, K2, L2, M1, M2, M3, M4, M6, M8, N2, 2N2, O1, OO1, P1, Q1, 2Q1, R2, S1, S2, S4, S6, T2, LDA2, MU2, NU2, RHO1, MK3, 2MK3, MN4, MS4, 2SM2, MF, MSF, MM, SA, SSA
-// These names match the NOAA names, except LDA2 here is LAM2 on NOAA's site
-
+unsigned int YearIndx = 0;
+float currHours = 0;
+const int adjustGMT = 5;char stationID[] = "Inlet (Coast Guard Station), Indian River, Delaware";
+const long stationIDnumber = 8558690;
+const float Datum = 1.48; // <-------------
+//   <-------------------J1, K1, K2, L2, M1, M2, M3, M4, M6, M8, N2, 2N2, O1, OO1, P1, Q1, 2Q1, R2, S1, S2, S4, S6, T2, LDA2, MU2, NU2, RHO1, MK3, 2MK3, MN4, MS4, 2SM2, MF, MSF, MM, SA, SSA
 typedef float PROGMEM prog_float_t;
-
-// amplitude of each of the site harmonic constituent
-const prog_float_t Amp[] PROGMEM = {0.033,0.518,0.089,0.023,0.023,0.807,0.01,0.03,0,0,0.151,0.016,0.495,0.016,0.174,0.105,0.016,0.003,0.043,0.315,0,0,0.023,0.007,0,0.033,0.016,0.01,0.013,0.016,0.02,0,0,0,0,0.299,0.121};
-
-// 'modified' or 'adapted' phase lag (Epoch) of each site harmonic constituent
-const prog_float_t Kappa[] PROGMEM = {20.8,12.4,134.6,143.1,15.7,123.1,298.6,76,0,0,120.3,110.1,3.6,4.7,12.5,348,340.8,141.7,93.8,141,0,0,119.1,131.4,0,121.6,341.8,331.7,309,51,90.5,0,0,0,0,151.9,48.2};
-
-// constituent frequency denoted as little 'a' by Hicks 2006
+const prog_float_t Amp[] PROGMEM = {0.016,0.233,0.062,0.052,0.013,1.23,0,0.072,0.01,0,0.282,0.033,0.2,0.01,0.075,0.033,0.007,0.003,0.02,0.223,0,0,0.013,0.01,0.023,0.052,0.007,0.02,0.02,0.036,0.023,0,0.046,0,0.062,0.2,0.105};
+const prog_float_t Kappa[] PROGMEM = {216.4,210.6,42.6,43.9,204.6,24.1,0,179.7,248.7,0,1.9,349.3,198.9,222.2,203.9,193.4,187.1,47.5,122.9,47.5,0,0,47.4,35,354.2,4.6,193.8,17.1,13.1,165.5,203.3,0,182.2,0,243.6,153.5,43.6};
 const prog_float_t Speed[] PROGMEM = {15.58544,15.04107,30.08214,29.52848,14.49669,28.9841,43.47616,57.96821,86.95231,115.9364,28.43973,27.89535,13.94304,16.1391,14.95893,13.39866,12.85429,30.04107,15,30,60,90,29.95893,29.45563,27.96821,28.51258,13.47151,44.02517,42.92714,57.42383,58.9841,31.0159,1.098033,1.015896,0.5443747,0.0410686,0.0821373};
 const prog_float_t Equilarg[10][37] PROGMEM = { 
-{76.92,1.58,183.41,39.83,314.62,126.83,10.24,253.65,20.48,147.31,47.32,327.82,129.41,45.42,349.63,49.91,330.4,177.1,180,0,0,0,2.9,98.47,255.68,335.19,337.77,128.41,252.07,174.15,126.83,233.17,48,233.17,79.5,280.37,200.73},
 {165.67,1.37,182.52,211.35,206.58,227.47,341.21,94.94,322.41,189.88,59.24,251.02,230.02,304.87,349.87,61.8,253.57,176.84,180,0,0,0,3.16,9.64,97.08,265.3,267.86,228.84,93.57,286.71,227.47,132.53,307.42,132.53,168.23,280.13,200.25},
 {269.75,3.07,185.62,17.26,90.25,303.97,275.96,247.95,191.92,135.9,33.96,123.94,304.24,235.22,349.13,34.23,124.21,177.57,180,0,0,0,2.43,267.98,249.95,159.97,160.24,307.04,244.88,337.93,303.97,56.03,235.49,56.03,270.01,280.87,201.75},
 {0.7,4.49,188.41,224.35,24.63,45.09,247.63,90.18,135.26,180.35,46.35,47.61,43.13,140.79,349.36,44.39,45.65,177.32,180,0,0,0,2.68,179.62,91.82,90.56,88.6,49.58,85.68,91.44,45.09,314.91,138.83,314.91,358.74,280.64,201.27},
@@ -41,11 +21,11 @@ const prog_float_t Equilarg[10][37] PROGMEM = {
 {290.4,12,204.13,41.02,96.21,324.92,127.37,289.83,254.75,219.66,46.94,128.97,312.48,252.38,349.1,34.51,116.54,177.53,180,0,0,0,2.47,262.34,289.52,207.49,195.06,336.91,277.83,11.86,324.92,35.08,239.95,35.08,277.97,280.9,201.81},
 {22.4,14.26,208.93,250.96,25.28,66.36,99.53,132.71,199.07,265.43,59.66,52.97,50.65,160.77,349.33,43.96,37.26,177.28,180,0,0,0,2.72,174.3,131.72,138.41,122.7,80.62,118.45,126.02,66.36,293.64,145.06,293.64,6.69,280.67,201.33},
 {114.06,16.25,213.08,101.09,323.67,167.68,71.52,335.37,143.05,310.73,72.27,336.85,149.03,68.26,349.57,53.62,318.2,177.02,180,0,0,0,2.98,86.15,333.8,69.21,50.56,183.94,319.11,239.95,167.68,192.32,49.61,192.32,95.42,280.43,200.85},
-{205.14,17.78,216.09,279.46,220.94,268.83,43.24,177.66,86.49,355.32,84.69,260.55,247.83,334.17,349.81,63.69,239.55,176.77,180,0,0,0,3.23,357.82,175.7,359.84,338.83,286.61,159.88,353.52,268.83,91.17,313.17,91.17,184.14,280.19,200.38} 
+{205.14,17.78,216.09,279.46,220.94,268.83,43.24,177.66,86.49,355.32,84.69,260.55,247.83,334.17,349.81,63.69,239.55,176.77,180,0,0,0,3.23,357.82,175.7,359.84,338.83,286.61,159.88,353.52,268.83,91.17,313.17,91.17,184.14,280.19,200.38},
+{309.38,19.6,219.48,75.08,101.48,345.37,338.06,330.74,316.11,301.48,59.44,133.52,321.92,264.98,349.06,35.99,110.07,177.5,180,0,0,0,2.5,256.21,328.61,254.54,231.08,4.97,311.14,44.82,345.37,14.63,241.53,14.63,285.93,280.94,201.87} 
  };
 
 const prog_float_t Nodefactor[10][37] PROGMEM = { 
-{0.9761,0.9782,0.9272,0.9582,1.6115,1.0117,1.0176,1.0235,1.0354,1.0475,1.0117,1.0117,0.9643,0.8745,1,0.9643,0.9643,1,1,1,1,1,1,1.0117,1.0117,1.0117,0.9643,0.9897,1.0012,1.0235,1.0117,1.0117,0.9188,1.0117,1.039,1,1},
 {1.0336,1.0176,1.0225,0.7337,1.9813,0.9992,0.9989,0.9985,0.9977,0.9969,0.9992,0.9992,1.0279,1.0859,1,1.0279,1.0279,1,1,1,1,1,1,0.9992,0.9992,0.9992,1.0279,1.0168,1.016,0.9985,0.9992,0.9992,1.0571,0.9992,0.9955,1,1},
 {1.0836,1.0529,1.1201,1.0649,1.5936,0.987,0.9805,0.9741,0.9614,0.9489,0.987,0.987,1.085,1.309,1,1.085,1.085,1,1,1,1,1,1,0.987,0.987,0.987,1.085,1.0392,1.0257,0.9741,0.987,0.987,1.1924,0.987,0.953,1,1},
 {1.1226,1.0812,1.2075,1.3148,1.0585,0.9763,0.9646,0.9531,0.9305,0.9084,0.9763,0.9763,1.131,1.5151,1,1.131,1.131,1,1,1,1,1,1,0.9763,0.9763,0.9763,1.131,1.0555,1.0305,0.9531,0.9763,0.9763,1.3097,0.9763,0.9161,1,1},
@@ -54,39 +34,39 @@ const prog_float_t Nodefactor[10][37] PROGMEM = {
 {1.164,1.112,1.3131,1.0008,1.8466,0.9636,0.9459,0.9285,0.8947,0.8621,0.9636,0.9636,1.1814,1.7726,1,1.1814,1.1814,1,1,1,1,1,1,0.9636,0.9636,0.9636,1.1814,1.0715,1.0324,0.9285,0.9636,0.9636,1.4479,0.9636,0.8727,1,1},
 {1.1522,1.1031,1.2815,1.3288,1.0994,0.9674,0.9515,0.9358,0.9052,0.8757,0.9674,0.9674,1.1668,1.6946,1,1.1668,1.1668,1,1,1,1,1,1,0.9674,0.9674,0.9674,1.1668,1.0671,1.0323,0.9358,0.9674,0.9674,1.4069,0.9674,0.8856,1,1},
 {1.1276,1.0849,1.2196,1.091,1.6268,0.9748,0.9625,0.9502,0.9263,0.903,0.9748,0.9748,1.137,1.544,1,1.137,1.137,1,1,1,1,1,1,0.9748,0.9748,0.9748,1.137,1.0576,1.0309,0.9502,0.9748,0.9748,1.3257,0.9748,0.9111,1,1},
-{1.0904,1.0578,1.1347,0.6859,2.1026,0.9852,0.9779,0.9705,0.9561,0.942,0.9852,0.9852,1.093,1.3431,1,1.093,1.093,1,1,1,1,1,1,0.9852,0.9852,0.9852,1.093,1.0422,1.0267,0.9705,0.9852,0.9852,1.2123,0.9852,0.9468,1,1} 
- };
+{1.0904,1.0578,1.1347,0.6859,2.1026,0.9852,0.9779,0.9705,0.9561,0.942,0.9852,0.9852,1.093,1.3431,1,1.093,1.093,1,1,1,1,1,1,0.9852,0.9852,0.9852,1.093,1.0422,1.0267,0.9705,0.9852,0.9852,1.2123,0.9852,0.9468,1,1},
+{1.042,1.0235,1.0379,0.9408,1.7337,0.9973,0.9959,0.9945,0.9918,0.9891,0.9973,0.9973,1.0374,1.1206,1,1.0374,1.0374,1,1,1,1,1,1,0.9973,0.9973,0.9973,1.0374,1.0207,1.0179,0.9945,0.9973,0.9973,1.0788,0.9973,0.9887,1,1}
+};
 
-// unix time values for the start of each year
-//                                            2019       2020       2021       2022       2023       2024       2025       2026       2027       2028
-const unsigned long startSecs[] PROGMEM = {1546300800,1577836800,1609459200,1640995200,1672531200,1704067200,1735689600,1767225600,1798761600,1830297600};
+// >--------------   2020       2021       2022       2023       2024       2025       2026       2027       2028       2029
+const unsigned long startSecs[] PROGMEM = {1577836800,1609459200,1640995200,1672531200,1704067200,1735689600,1767225600,1798761600,1830297600,1861920000};
 
-const unsigned int startYear = 2019;        // 1st year of data in the Equilarg/Nodefactor/startSecs arrays.
-
+const unsigned int startYear = 2020;
 float currAmp, currSpeed, currNodefactor, currEquilarg, currKappa, tideHeight;
 
 TideCalc::TideCalc(void){}
 
 char* TideCalc::returnStationID(void){
-    return stationID;
+	return stationID;
 }
 
 long TideCalc::returnStationIDnumber(void){
-    return stationIDnumber;
+	return stationIDnumber;
 }
 
 float TideCalc::currentTide(DateTime now) {
 	YearIndx = now.year() - startYear;
-	currHours = (now.unixtime() - pgm_read_dword_near(&startSecs[YearIndx])) / float(3600);
-    currHours = currHours + adjustGMT;
-    tideHeight = Datum; 
-    for (int harms = 0; harms < 37; harms++) {
-        currNodefactor = pgm_read_float_near(&Nodefactor[YearIndx][harms]);
- 		currAmp = pgm_read_float_near(&Amp[harms]);
-        currEquilarg = pgm_read_float_near(&Equilarg[YearIndx][harms]);
-        currKappa = pgm_read_float_near(&Kappa[harms]);
-        currSpeed = pgm_read_float_near(&Speed[harms]);
-        tideHeight = tideHeight + (currNodefactor * currAmp * cos( (currSpeed * currHours + currEquilarg - currKappa) * DEG_TO_RAD));
-    }
-    return tideHeight;
+ 	currHours = (now.unixtime() - pgm_read_dword_near(&startSecs[YearIndx])) / float(3600);
+	currHours = currHours + adjustGMT;
+	tideHeight = Datum; // initialize results variable, units of feet.
+	for (int harms = 0; harms < 37; harms++) {
+		currNodefactor = pgm_read_float_near(&Nodefactor[YearIndx][harms]);
+		currAmp = pgm_read_float_near(&Amp[harms]);
+		currEquilarg = pgm_read_float_near(&Equilarg[YearIndx][harms]);
+		currKappa = pgm_read_float_near(&Kappa[harms]);
+		currSpeed = pgm_read_float_near(&Speed[harms]);
+		tideHeight = tideHeight + (currNodefactor * currAmp *
+		 	cos( (currSpeed * currHours + currEquilarg - currKappa) * DEG_TO_RAD));
+	}
+return tideHeight;
 }

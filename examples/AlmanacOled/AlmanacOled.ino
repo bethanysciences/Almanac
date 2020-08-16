@@ -1,5 +1,5 @@
- /*
- * -----------------------------------------------------------------------------
+/*
+ * ---------------------------------------------------------------------------------------------
  * 
  * Almanac for specific Latitude and Longitudes
  * Operates independantly not needing an Internet connection
@@ -17,21 +17,43 @@
  * No accuracy or warranty is given or implied for these predictions.
  * 
  * 
- * HARDWARE USED
- * -----------------------------------------------------------------------------
+ * 
+ * * * * * * KEY FUNCTIONS USED * * * * 
+ * ---------------------------------------------------------------------------------------------
+ * Tide events calculated using Luke Miller's library of NOAA harmonic data 
+ * https://github.com/millerlp/Tide_calculator derived from David Flater's
+ * XTide application https://flaterco.com/xtide/xtide.html. Futher logic is
+ * derived from rabbitcreek's https://github.com/rabbitcreek/tinytideclock
+ * 
+ * Sun events calculated using SunEvents library 
+ * https://github.com/bethanysciences/SunEvents outputting sunrises and sets
+ * to a RTClib DateTime object, a derivative of DM Kishi's library 
+ * https://github.com/dmkishi/Dusk2Dawn, based on a port of NOAA's Solar 
+ * Calculator https://www.esrl.noaa.gov/gmd/grad/solcalc/
+ * 
+ * Timers use the RTCZero library alarms https://github.com/arduino-libraries/RTCZero 
+ * setAlarmTime(uint8_t hours, uint8_t minutes, uint8_t seconds)
+ * 
+ * * * * * * HARDWARE USED * * * * 
+ * ---------------------------------------------------------------------------------------------
  * 
  * Microprocessors written for (others may work)
- * Arduino Nano 33 IoT https://store.arduino.cc/usa/nano-33-iot and 
+ * Arduino Nano 33 IoT https://store.arduino.cc/usa/nano-33-iot
+ *           https://github.com/ostaquet/Arduino-Nano-33-IoT-Ultimate-Guide
+ * Interrupt Pins 2, 3, 9, 10, 11, 13, 15, A5, A7
+ * 
  * Arduino Nano 33 BLE Sense https://store.arduino.cc/usa/nano-33-ble-sense
  * Arduino Nano 33 BLE https://store.arduino.cc/usa/nano-33-ble
- * 
+ * Interrupt Pins All
  * 
  * Time Maintenance
  * Adafruit's battery backed I2C Maxim DS3231 Real Time Clock (RTC) Module 
  * https://www.adafruit.com/product/3013 using Adafruit's 
  * library https://github.com/adafruit/RTClib a fork of JeeLab's library 
  * https://git.jeelabs.org/jcw/rtclib - installed from Arduino IDE as [RTClib]
- * 
+ * DateTime(year, month, day, hour, min, sec)
+ * DateTime(SECONDS_FROM_1970_TO_2000)
+ * uint8_t isPM() 0 AM 1 PM
  * 
  * Lightening Events
  * Sparkfun's Franklin AS3935 Lightning Detector Breakout Board V2
@@ -46,7 +68,7 @@
  * readNoiseLevel()
  * maskDisturber(bool)         read/set mask disturber events (false default)
  * readMaskDisturber(bool)
- * setIndoorOutdoor(hex)       0xE, 0x12 (default) attunates for inside use
+ * setIndoorOutdoor(hex)       0xE outdoor, 0x12 indoor (default) attunates for inside use
  * readIndoorOutdoor(hex)
  * watchdogThreshold(int)      read/set watchdog threshold 1-10 (2 default)
  * readWatchdogThreshold()
@@ -60,216 +82,314 @@
  *                             skewing built-up calibrations. Calibrate 
  *                             antenna before using this function
  * 
- * 
- * Display
- * MakerHawk's 1.5" 128x128 SSD1327 I2C Driven OLED display from Amazon 
- * https://www.amazon.com/s?k=MakerHawk&ref=bl_dp_s_web_18510440011
- * driven by olikraus's U8g2: Library for monochrome displays, ver 2 
- * https://github.com/olikraus/u8g2 - install from Arduino IDE as [U8g2] fonts
- * can be found here https://github.com/olikraus/u8g2/wiki/fntlist8x8
+ * OLED Display
+ * MakerHawk 1.5" 128x128 Pixels SSD1327 Driver I2C based OLED Display
+ * https://www.amazon.com/s?k=MakerHawk&ref=bl_dp_s_web_18510440011 using Olikraus's 
+ * https://github.com/olikraus/u8g2 library - installed from Arduino IDE as [oled_0]
+ * setI2CAddress(0x7A) (0x78)
  * 
  * 
- * ADDITIONAL FUNCTIONS USED
- * -----------------------------------------------------------------------------
- * Tide events calculated using Luke Miller's library of NOAA harmonic data 
- * https://github.com/millerlp/Tide_calculator derived from David Flater's
- * XTide application https://flaterco.com/xtide/xtide.html. Futher logic is
- * derived from rabbitcreek's https://github.com/rabbitcreek/tinytideclock
+ *  * * * * * * MICE TYPE * * * * 
+ * ---------------------------------------------------------------------------------------------
  * 
- * Sun events calculated using SunEvents library 
- * https://github.com/bethanysciences/SunEvents outputting sunrises and sets
- * to a RTClib DateTime object, a derivative of DM Kishi's library 
- * https://github.com/dmkishi/Dusk2Dawn, based on a port of NOAA's Solar 
- * Calculator https://www.esrl.noaa.gov/gmd/grad/solcalc/
- *  
- * 
- * This application and project are open source using MIT License see 
- * license.txt.
- *  
+ * This application and project are open source using MIT License see license.txt
  * See included library github directories for their respecive licenses
  *  
- *******************|*******************|*******************|******************/
+ * ---------------------------------------------------------------------------------------------
+ */
 
+// ---------------  SERIAL PRINT DEBUG SWITCH ------------- //
+#define DEBUG false                                          // true setup and use serial print
 
-// ------------  AS3935 LIGHTNING  ------------ //
+// ---------------  DS3231 REAL-TIME CLOCK  --------------- //
+#include <RTClib.h>                                         // version=1.8.0
+RTC_DS3231 rtc;                                             // instantiate RTC module
+#define GMT_OFFSET              -5                          // LST hours GMT offset
+char ampm[2][3]                 = {"pm", "am"};               // AM/PM
+#define USE_USLDT               true                        // US daylight savings?
+char LOC[3][4]                  = {"LST",                   // Local Standard Time (LST)
+                                   "LDT"};                  // Local Daylight Time (LDT)
+char dayNames[7][4]             = {"Sun", "Mon", "Tue", 
+                                   "Wed", "Thu", "Fri", "Sat"};
+char monthNames[12][4]          = {"Jan", "Feb", "Mar", "Apr", 
+                                   "May", "Jun", "Jul", "Aug",
+                                   "Sep", "Oct", "Nov", "Dec"};
+    
 
+// ---------------  SAMD Clock Access  --------------- //
+#include <RTCZero.h>
+RTCZero chrono;
+
+// ---------------  SUN EVENTS  --------------------------- //
+#include <SunEvent.h>                                       // version=0.1.0
+float LATITUDE                  = 38.5393;                  // Bethany Beach, DE, USA
+float LONGITUDE                 = -75.0547;
+SunEvent BethanyBeach(LATITUDE, LONGITUDE, GMT_OFFSET);
+DateTime nextrise, nextset;
+
+// ---------------  TIDE CALCULATIONS  -------------------- //
+#include "tides.h"
+TideCalc myTideCalc;
+DateTime adjHigh, adjLow;
+
+// ---------------  AS3935 LIGHTNING  --------------------- //
 #include <SparkFun_AS3935.h>
-#define LIGHTNING_INT           0x08
-#define DISTURBER_INT           0x04
-#define NOISE_INT               0x01
-#define AS3935_CS               11     // AS3935 chip select pin
-#define AS3935_STRIKE           4      // strike detection interrupt pin (HIGH)
-byte noiseFloor = 2;
-byte watchDogVal = 2;
-byte spike = 2;
-byte lightningThresh = 1;
+#define AS3935_CS_PIN               10                      // AS3935 chip select pin
+#define AS3935_STRIKE_PIN           6                       // strike interrupt pin (HIGH)
+
+#define AS3935_INT_LIGHTNING        0x08
+#define AS3935_INT_DISTURBER        0x04
+#define AS3935_INT_NOISE            0x01
+
+#define AS3935_MASK_DISTURBER       false           // mask disturber events false[d]
+#define AS3935_INDOOR_OUTDOOR       0xE             // attenuator outside 0xE or inside 0x12[d]
+#define AS3935_NOISE_LEVEL          2               // noise floor 1-7 (2 default)
+#define AS3935_WATCHDOG_THRESHOLD   2               // watchdog threshold 1-10 (2 default)
+#define AS3935_SPIKE_REJECTION      2               // spike rejection 1-11 (2 default)
+#define AS3935_LIGHTENING_THRESHOLD 1               // strikes to trip interrupt 1,5,9, or 26
+char indoorOutdoor[2][20] =         {"INDOOR 0xE", "OUTDOOR 0x12"};
+int  inOut;
+char falseTrue[2][5] =              {"NO", "YES"};
 SparkFun_AS3935 strike;
 
+// ---------------  NEO PIXELS  --------------------------- //
+#include <Adafruit_NeoPixel.h>
+#define LED_PIN                 3
+#define LED_COUNT               8
+bool heartBeat =                true;                          // for heartbeat
+unsigned long                   lastMillis;
+#define NEO_RED                 0xFF0000
+#define NEO_ORANGE              0xFF8000
+#define NEO_YELLOW              0xFFFF00
+#define NEO_GREEN               0x00FF00
+#define NEO_CYAN                0x00FFFF
+#define NEO_LIGHTBLUE           0x00BFFF
+#define NEO_BLUE                0x0000FF
+#define NEO_PURPLE              0x8000FF
+#define NEO_PINK                0xFF00FF
+#define NEO_WHITE               0xFFFFFF
+#define NEO_OFF                 0x000000
+Adafruit_NeoPixel strip(LED_COUNT, LED_PIN, NEO_GRB + NEO_KHZ800);
 
-// ------------  NEO PIXELS  ------------ //
-#include <Adafruit_NeoPixel_ZeroDMA.h>
-#define NEO_PIN         8
-#define NEO_PIXELS      1
-Adafruit_NeoPixel_ZeroDMA strip(NEO_PIXELS, NEO_PIN, NEO_GRB);
+// ---------------  OLED DISPLAY  ------------------------- //
+#include <U8g2lib.h>
+U8G2_SSD1327_MIDAS_128X128_F_HW_I2C u8g2(U8G2_R0, U8X8_PIN_NONE);
+#define LINE_HEIGHT             14
+#define TITLE_LINE              14
+#define LOCATION_LINE           28
+#define TIME_LINE               42
+#define STRIKE_LINE             56
+#define TIDE_LINE               70
+#define LOHI_LINE               84
+#define HEIGHT_LINE             98
+#define SUN_LINE                112
+#define LIGHT_LINE              126
 
-
-// ------------  OLED DISPLAYS  ------------ //
-#include <U8x8lib.h>                        // version=2.27.6
-U8X8_SSD1327_MIDAS_128X128_HW_I2C u8x8(U8X8_PIN_NONE);
-#define SPRITE_X            0               // visual indicator screen positions
-#define SPRITE_Y            14
-
-
-// ------------  DS3231 REAL-TIME CLOCK  ------------ //
-#include <RTClib.h>                         // version=1.8.0
-RTC_DS3231 rtc;                             // instantiate RTC module
-#define USE_USLDT           true            // location uses US daylight savings
-char LOC[3][4]              = {"LST",       // for Local Standard Time (LST)
-                               "LDT"};      // and Local Daylight Time (LDT)
-#define GMT_OFFSET          -5              // LST hours GMT offset
-
-
-// ------------  SUN EVENTS  ------------ //
-#include <SunEvent.h>                       // version=0.1.0
-float LATITUDE              = 27.9719;      // Clearwater Beach, FL, USA
-float LONGITUDE             = -82.8265;
-SunEvent ClearwaterBeach(LATITUDE, LONGITUDE, GMT_OFFSET);
-
-
-// ------------  TIDE CALCULATIONS  ------------ //
-#include "TidelibClearwaterBeachGulfOfMexicoFlorida.h"
-TideCalc myTideCalc;
-float INTERVAL              = 1 * 5 * 60L;  // tide calc interval
-float results;                              // needed to print tide height
-
-
-
-// ------------  SETUP RUNS ONCE  ------------ // 
 void setup() {
-    asm(".global _printf_float");           // printf renders floats
+    asm(".global _printf_float");                           // printf renders floats
 
-    Serial.begin(115200);                                       // while(!Serial);
-    Serial.println("\n\nstartup");
+#if DEBUG
+    Serial.begin(115200);
+    while (!Serial);                                        // wait for serial port to open
+    Serial.println("\nsetup() ------------------------------------------------------------");
+#endif
 
+    chrono.begin();
+    chrono.enableAlarm(chrono.MATCH_SS);                    // fire every minute
+    chrono.attachInterrupt(chronoFire);
+  
+    strip.begin();
+    cycleNEO();
+    //strip.setBrightness(75);
+    //strip.setPixelColor(0, NEO_GREEN); 
+    //strip.show();
 
-    pinMode(AS3935_STRIKE, INPUT);                              // strike detected int pin set
-    SPI.begin();
-    while(!strike.beginSPI(AS3935_CS, 2000000));
-    // strike.maskDisturber(true);                                 // default = false
+    Serial.println("\nu8g2.begin() -------------------------------------------------------");
+    u8g2.begin();
+    oledSetup();
 
+    strip.setBrightness(75);
+    strip.setPixelColor(1, NEO_GREEN); 
+    strip.show();
 
-    u8x8.begin();                           // Start OLED display
-    u8x8.setFont(u8x8_font_pressstart2p_f); // load font
-    
-    if (! rtc.begin()) while (1);           // wait until RTC starts
-    if (rtc.lostPower()) {                  // if module lost power reset time
+    if (! rtc.begin()) while (1);                           // wait until RTC starts
+    if (rtc.lostPower()) {                                  // if module lost power reset time
         rtc.adjust(DateTime(F(__DATE__), F(__TIME__)));
     }
-
-    delay(5000);                            // flush registers
+    strip.setBrightness(75);
+    strip.setPixelColor(2, NEO_CYAN); 
+    strip.show();
     
-    u8x8.drawString(4, 0,  "ALMANAC");      // push static labels
-    u8x8.drawString(2, 4,  "Tide Events");
-    u8x8.drawString(0, 5,  "H");
-    u8x8.drawString(1, 6,  "Current");    
-    u8x8.drawString(0, 7,  "L");
-    u8x8.drawString(2, 9,  "Sun Events");
-    u8x8.drawString(0, 10, "Rise");
-    u8x8.drawString(0, 11, "Daylight");
-    u8x8.drawString(0, 12, "Set");
-}
 
-// ------------  MAIN  ------------ // 
-void loop() {
+    delay(1000);
 
-    if(digitalRead(AS3935_STRIKE) == HIGH) {    // check for lightening event
-        eventDetected();
-    }
-
-    displayTime();                              // get current & update time
-  
-    getTideEvents();                            // run tide and sun events
-    getSunEvents();
-
-    delayLoop();                                // loop delay
-}
-
-
-// ------------  GET CURRENT TIME AND UPDATE DISPLAY ------------ // 
-void displayTime() {
-    DateTime now = rtc.now();                   // get current time from RTC
-    char curr_date_buf[] = "DDD  MM/DD/YY";
-    u8x8.drawString(1, 1, now.toString(curr_date_buf));
-    char curr_time_buf[] = "hh:mm ap";
-    u8x8.drawString(1, 2, now.toString(curr_time_buf));
-    u8x8.drawString(26, 2, LOC[isLDT(now)]);    // render LST ot LDT
-}
-
-
-// ------------  DELAY LOOP ------------ // 
-void delayLoop() {
-    u8x8.drawString(SPRITE_X, SPRITE_Y, "|");
-    delay(250);
-    u8x8.drawString(SPRITE_X, SPRITE_Y, "/");
-    delay(250);
-    u8x8.drawString(SPRITE_X, SPRITE_Y, "-");
-    delay(250);
-    u8x8.drawString(SPRITE_X, SPRITE_Y, "\\");
-    delay(250);
-    u8x8.drawString(SPRITE_X, SPRITE_Y, "|");
-}
-
-
-// ------------  AS3935 INTERRUPT TRIPPED ------------ // 
-void eventDetected() {
-    Serial.print("event register 0x0");
+    pinMode(AS3935_STRIKE_PIN, INPUT);
+    while(!strike.beginSPI(AS3935_CS_PIN, 2000000));
     
-    int intVal = strike.readInterruptReg();
-    Serial.print(intVal, HEX);
+    strip.setBrightness(75);
+    strip.setPixelColor(3, NEO_CYAN); 
+    strip.show();
+
+#if DEBUG
+    timeStatus();
+    strikeStatus();
+#endif
+
+    delay(1000);
+    Time();
+    strip.setBrightness(75);
+    strip.setPixelColor(2, NEO_GREEN); 
+    strip.show();
     
-    if(intVal == NOISE_INT) {
-        Serial.println("\tnoise event");
-        strip.setPixelColor(0, 255, 255, 0);
-    }
-    else if(intVal == DISTURBER_INT) {
-        Serial.println("\tdisturber event");
-        strip.setPixelColor(0, 255, 0, 255);
-    }
-    else if(intVal == LIGHTNING_INT) {
-        Serial.print("\tstrike distance ");           
-        Serial.print(strike.distanceToStorm() /.621371);         //  * .621371 for miles
-        Serial.println(" mi."); 
-        strip.setPixelColor(0, 0, 0, 255);
-    }
+    Sun();
+    strip.setBrightness(75);
+    strip.setPixelColor(2, NEO_GREEN); 
+    strip.show();
+    
+    Tides();
+    strip.setBrightness(75);
+    strip.setPixelColor(3, NEO_GREEN); 
     strip.show();
 }
 
+void oledSetup() {
+    u8g2.clearBuffer();
+    u8g2.setFont(u8g2_font_9x18_tr);
+    char title_0[] = "ALMANAC";
+    u8g2.setCursor((u8g2.getDisplayWidth() - u8g2.getStrWidth(title_0))/2, TITLE_LINE);
+    u8g2.print(title_0);
+    u8g2.setFont(u8g2_font_crox1h_tf);
 
-// ------------  CALC AND DISPLAY TIDE EVENTS  ------------ // 
-void getTideEvents() {
-    u8x8.drawString(SPRITE_X, SPRITE_Y, "T");   // render activity sprite
+    char location_0[] = "Bethany Beach, DE USA";
+    u8g2.setCursor((u8g2.getDisplayWidth() - u8g2.getStrWidth(location_0))/2, LOCATION_LINE);
+    u8g2.print(location_0);
+    u8g2.sendBuffer();
+
+    char strike_0[] = "LIGHTENING Scan...";
+    u8g2.setCursor((u8g2.getDisplayWidth() - u8g2.getStrWidth(strike_0))/2, STRIKE_LINE);
+    u8g2.print(strike_0);
+}
+
+void loop() {
+    if(digitalRead(AS3935_STRIKE_PIN) == HIGH) Strike();
+
+    if (millis() - lastMillis >= 2 * 1000UL) {                      // every 2 seconds
+        lastMillis = millis();
+        if(heartBeat) strip.setPixelColor(5, NEO_GREEN);            // heartbeat
+        if(!heartBeat) strip.setPixelColor(5, NEO_OFF);
+        heartBeat = !heartBeat;
+        strip.show();
+    }
+}
+
+void chronoFire() {                                             // update time each minute
+    Time();
+    Sun();
+    Tides();
+}
+void Time() {
+    DateTime now = rtc.now();
+    char time_buf[80];
+    sprintf(time_buf, "%s %s %d %d:%02d%s %s", 
+            dayNames[now.dayOfTheWeek()], monthNames[now.month()], now.day(),
+            now.twelveHour(), now.minute(), ampm[isAM(now)], LOC[isLDT(now)]);
+
+    u8g2.setDrawColor(0);
+    u8g2.drawBox(0, TIME_LINE - LINE_HEIGHT, 127, LINE_HEIGHT);
+
+    u8g2.setDrawColor(1);
+    u8g2.setCursor((u8g2.getDisplayWidth() - u8g2.getStrWidth(time_buf))/2, TIME_LINE);
+    u8g2.print(time_buf);
+
+    u8g2.sendBuffer();
+
+#ifdef DEBUG      
+    Serial.print("Time() ---- ");
+    Serial.print(time_buf);
+
+    char timer_buf[60];
+    sprintf(timer_buf, " -- uptime %d:%02d:%02d ---", chrono.getHours(), 
+            chrono.getMinutes(), chrono.getSeconds());
+    Serial.println(timer_buf);
+#endif
+
+}
+void Strike() {
+    DateTime now = rtc.now();
+    char strike_buf[40] = "\0";
+    int intVal = strike.readInterruptReg();
+
+    if(intVal == AS3935_INT_NOISE) {                                    // NOISE
+        sprintf(strike_buf, "Noise (0x0%X) %d:%2d", 
+                intVal, now.hour(), now.minute());
+        //strip.setPixelColor(7, NEO_ORANGE);
+    }
+
+    else if(intVal == AS3935_INT_DISTURBER) {                           // DISTURBER
+        sprintf(strike_buf, "disturb (0x0%X) %d:%2d", 
+                intVal, now.hour(), now.minute());
+        //strip.setPixelColor(7, NEO_YELLOW);
+    }
+
+    else if(intVal == AS3935_INT_LIGHTNING) {                           // STRIKE
+        sprintf(strike_buf, "STRIKE %d:%2d  %d.%dkm", 
+                now.hour(), now.minute(), 
+                (int)strike.distanceToStorm(), (int)(strike.distanceToStorm()*10)%10);
+
+        u8g2.setDrawColor(0);
+        u8g2.drawBox(0, STRIKE_LINE - LINE_HEIGHT, 127, LINE_HEIGHT);
+
+        u8g2.setDrawColor(1);
+        u8g2.setCursor((u8g2.getDisplayWidth() - u8g2.getStrWidth(strike_buf))/2, STRIKE_LINE);
+        u8g2.print(strike_buf);
+
+        u8g2.sendBuffer();
+        cycleNEO();
+        strip.setPixelColor(7, NEO_RED);
+        strip.setPixelColor(5, NEO_GREEN);
+    }
+
+    strip.show();
+
+#ifdef DEBUG
+        Serial.println(strike_buf);
+#endif  
+}
+void Tides() {
+    float INTERVAL              = 1 * 5 * 60L;                  // tide calc interval
+    float results;                                              // needed to print tide height
     DateTime futureHigh;
     DateTime futureLow;
     DateTime future;
     uint8_t slope;
-    uint8_t i               = 0;
-    uint8_t zag             = 0;
-    bool    gate            = 1;
-    float   tidalDifference = 0;
-    bool    bing            = 1;
-    bool    futureLowGate   = 0;
-    bool    futureHighGate  = 0;
-    
-    DateTime now = rtc.now();                   // current time from RTC
-    DateTime adjnow(now.unixtime() 
-             - (isLDT(now) * 3600));            // convert to LST during LDT
+    uint8_t i                   = 0;
+    uint8_t zag                 = 0;
+    bool    gate                = 1;
+    bool    hiLow;
+    float   tidalDifference     = 0;
+    bool    bing                = 1;
+    bool    futureLowGate       = 0;
+    bool    futureHighGate      = 0;
+    char    tide_buf[40]        = "\0";
+    char    lohi_buf[40]        = "\0";
+    char    height_buf[50]      = "\0";
+
+    DateTime now = rtc.now();                                   // current time from RTC
+    DateTime adjnow(now.unixtime() - (isLDT(now) * 3600));      // convert to LST during LDT
 
     float pastResult = myTideCalc.currentTide(adjnow);
 
-    u8x8.setCursor(9, 6);
-    u8x8.print(pastResult, 2);
-    u8x8.print("'");
-        
+    sprintf(tide_buf, "TIDES    Cur Level %d.%d'", (int)pastResult, (int)(pastResult*10)%10);
+
+    u8g2.setDrawColor(0);
+    u8g2.drawBox(0, TIDE_LINE - LINE_HEIGHT, u8g2.getDisplayWidth(), LINE_HEIGHT);
+
+    u8g2.setDrawColor(1);
+    u8g2.setCursor(3, TIDE_LINE);
+    u8g2.print(tide_buf);
+
+    u8g2.sendBuffer();
+
     while(bing){
         i++;
         DateTime future(adjnow.unixtime() + (i * INTERVAL));
@@ -293,49 +413,68 @@ void getTideEvents() {
             futureHighGate = 1;
         }
         if(futureHighGate && futureLowGate) {
-            bool hiLow;
             float resultsHigh = myTideCalc.currentTide(futureHigh);
             float resultsLow  = myTideCalc.currentTide(futureLow);
-        
             if(int(futureHigh.unixtime() - futureLow.unixtime()) < 0) hiLow = 1;
             if(int(futureHigh.unixtime() - futureLow.unixtime()) > 0) hiLow = 0;
-            
-            if (hiLow) {
-                DateTime adjHigh(futureHigh.unixtime() + 
-                (isLDT(futureHigh) * 3600));
 
-                char high_buf[] = "hh:mm ap";
-                u8x8.drawString(2, 5, adjHigh.toString(high_buf));
-                u8x8.setCursor(27, 5);
-                u8x8.print(resultsHigh, 1);
-                u8x8.print("'");
-                
-                DateTime adjLow(futureLow.unixtime() + 
-                         (isLDT(futureLow) * 3600));
-                
-                char low_buf[] = "hh:mm ap";
-                u8x8.drawString(2, 7, adjLow.toString(low_buf));
-                u8x8.setCursor(27, 7);
-                u8x8.print(resultsLow, 1);
-                u8x8.print("'");
+            if (hiLow) {
+                DateTime adjLow(futureLow.unixtime() + (isLDT(futureLow) * 3600));
+                DateTime adjHigh(futureHigh.unixtime() + (isLDT(futureHigh) * 3600));
+
+                sprintf(lohi_buf, "High %d:%02d%s  Low %d:%02d%s", 
+                                    adjHigh.twelveHour(), adjHigh.minute(), ampm[isAM(adjHigh)],
+                                    adjLow.twelveHour(),  adjLow.minute(),  ampm[isAM(adjLow)]); 
+                sprintf(height_buf, "Levels   %d.%d'      %d.%d'", 
+                                    (int)resultsHigh, (int)(resultsHigh * 10) % 10,
+                                    (int)resultsLow,  (int)(resultsLow * 10) % 10);
+                u8g2.setDrawColor(0);
+                u8g2.drawBox(0, LOHI_LINE - LINE_HEIGHT, 128, LINE_HEIGHT * 2);
+
+                u8g2.setDrawColor(1);
+                u8g2.setCursor((u8g2.getDisplayWidth() - u8g2.getStrWidth(lohi_buf)) / 2,
+                                LOHI_LINE);
+                u8g2.print(lohi_buf);
+
+                u8g2.setCursor(3, HEIGHT_LINE);
+                u8g2.print(height_buf);
+
+                u8g2.sendBuffer();
+#ifdef DEBUG      
+                Serial.print("Tides() --- ");
+                Serial.print(lohi_buf);
+                Serial.print("  ");
+                Serial.println(height_buf);
+#endif
             }
             else {
-                DateTime adjLow(futureLow.unixtime() + 
-                         (isLDT(futureLow) * 3600));
-                
-                char low_buf[] = "hh:mm ap";
-                u8x8.drawString(2, 7, adjLow.toString(low_buf));
-                u8x8.setCursor(27, 7);
-                u8x8.print(resultsLow, 1);
-                u8x8.print("'");
-                
-                DateTime adjHigh(futureHigh.unixtime() + 
-                         (isLDT(futureHigh) * 3600)); 
-                char high_buf[] = "hh:mm ap";
-                u8x8.drawString(2, 5, adjHigh.toString(high_buf));
-                u8x8.setCursor(27, 5);
-                u8x8.print(resultsHigh, 1);
-                u8x8.print("'");
+                DateTime adjLow(futureLow.unixtime() + (isLDT(futureLow) * 3600));
+                DateTime adjHigh(futureHigh.unixtime() + (isLDT(futureHigh) * 3600));
+
+                sprintf(lohi_buf, "Low %d:%02d%s  High %d:%02d%s", 
+                                   adjLow.twelveHour(),  adjLow.minute(), ampm[isAM(adjLow)],
+                                   adjHigh.twelveHour(), adjHigh.minute(),ampm[isAM(adjHigh)]); 
+                sprintf(height_buf, "Levels   %d.%d'      %d.%d'", 
+                                    (int)resultsLow,  (int)(resultsLow * 10) % 10,
+                                    (int)resultsHigh, (int)(resultsHigh * 10) % 10);
+                u8g2.setDrawColor(0);
+                u8g2.drawBox(0, LOHI_LINE - LINE_HEIGHT, 128, LINE_HEIGHT * 2);
+
+                u8g2.setDrawColor(1);
+                u8g2.setCursor((u8g2.getDisplayWidth() - u8g2.getStrWidth(lohi_buf)) / 2, 
+                               LOHI_LINE);
+                u8g2.print(lohi_buf);
+
+                u8g2.setCursor(3, HEIGHT_LINE);
+                u8g2.print(height_buf);
+
+                u8g2.sendBuffer();
+#ifdef DEBUG      
+                Serial.print("Tides() --- ");
+                Serial.print(lohi_buf);
+                Serial.print("  ");
+                Serial.println(height_buf);
+#endif
             }
             results = myTideCalc.currentTide(adjnow);
             gate = 1;
@@ -346,28 +485,40 @@ void getTideEvents() {
         pastResult = results;
     }
 }
+void Sun() {
+    char sun_buf[40]        = "\0";
+    char light_buf[40]      = "\0";
+    DateTime nextrise = BethanyBeach.sunrise(rtc.now());
+    DateTime nextset  = BethanyBeach.sunset(rtc.now());
+    TimeSpan sunlight = nextset.unixtime() - nextrise.unixtime();
 
+    sprintf(sun_buf, "Rise %d:%02d%s > Set %d:%02d%s", 
+                     nextrise.twelveHour(), nextrise.minute(), ampm[isAM(nextrise)],
+                     nextset.twelveHour(), nextset.minute(), ampm[isAM(nextset)]);
+    sprintf(light_buf, "%dhr %dmin of daylight", 
+                        sunlight.hours(), sunlight.minutes());
 
-// ------------  CALC AND DISPLAY SUN EVENTS  ------------ //
-void getSunEvents() {
-    u8x8.drawString(SPRITE_X, SPRITE_Y, "S");               // activity sprite
-    DateTime nextrise = ClearwaterBeach.sunrise(rtc.now());    
-    char rise_buf[] = "hh:mm ap";
-    u8x8.drawString(5, 10, nextrise.toString(rise_buf));
+    u8g2.setDrawColor(0);
+    u8g2.drawBox(0, SUN_LINE - LINE_HEIGHT, 127, LINE_HEIGHT * 2);
 
-    DateTime nextset  = ClearwaterBeach.sunset(rtc.now());    
-    char set_buf[] = "hh:mm ap";
-    u8x8.drawString(5, 12, nextset.toString(set_buf));
+    u8g2.setDrawColor(1);
+    u8g2.setCursor(3, SUN_LINE);
+    u8g2.print(sun_buf);
 
-    TimeSpan sunlight =  nextset.unixtime() - nextrise.unixtime();
-    //uint8_t D = (nextset.unixtime() - nextrise.unixtime());
-    char light_buf[20];
-    sprintf(light_buf, "%d:%d", sunlight.hours(), sunlight.minutes());
-    u8x8.drawString(10, 11, light_buf);
+    u8g2.setCursor((u8g2.getDisplayWidth() - u8g2.getStrWidth(light_buf))/2, LIGHT_LINE);
+    u8g2.print(light_buf);
+
+    u8g2.sendBuffer();
+
+#ifdef DEBUG      
+    Serial.print("Sun() ----- ");
+    Serial.print(sun_buf);
+    Serial.print("  ");
+    Serial.println(light_buf);
+#endif
+    
 }
 
-
-// ------------  DETERMINE IF US DAYLIGHT SAVINGS TIME  ------------ //
 bool isLDT(const DateTime& curLST) {
     if(!USE_USLDT) return false;            // location uses US daylight savings
     int y = curLST.year() - 2000;
@@ -394,102 +545,152 @@ bool isLDT(const DateTime& curLST) {
        curLST.month() < 3) 
        return false;                        // time is Local Standard Time (LST)
 }
-
-
-// ------------  RUN NEOPIXELS  ------------ //
+bool isAM(const DateTime& test) {
+    if (test.hour() > 12 | test.hour() == 0 | test.hour() == 12) return false;
+    else return true;
+}
+    
 void cycleNEO() {
-    Serial.print("cycleNEO\t");
-
-    // --- Cycle NEO Pixel ---
-    strip.begin();
-    strip.setBrightness(32);
-    strip.setPixelColor(0, 255, 0, 0); strip.show(); delay(100);
-    Serial.print("red ");
-    strip.setPixelColor(0, 0, 255, 0); strip.show(); delay(100);
-    Serial.print("green ");
-    strip.setPixelColor(0, 0, 0, 255); strip.show(); delay(100);
-    Serial.print("blue ");
-    strip.setPixelColor(0, 255, 255, 255); strip.show();
-    Serial.println("white ");
-}
-
-
-// ------------  DISPLAY AS3935 PARAMETERS  ------------ //
-void statusScreen() {
-    Serial.print("statusScreen\t");
+    int delayTime = 25;
+    strip.setBrightness(255);
     
-    // --- Get AS3935 Paramters ---
-    char disturberMask[2][20]   = {"ON", "OFF"};
-    char inOutdoor[2][20]       = {"IN", "OUT"};
-    int inOut;
-    char buf01[40];
-
-    if (strike.readIndoorOutdoor() == 18) inOut = 0;
-    else inOut = 1;
-
-    sprintf(buf01, "dist %s  %s  noise %d  watch %d  reg %d  strks %d", 
-            disturberMask[strike.readMaskDisturber()], inOutdoor[inOut], 
-            strike.readNoiseLevel(), strike.readWatchdogThreshold(),
-            strike.readSpikeRejection(), strike.readLightningThreshold());
-
-    
-    // --- Display Status ---
-    // display.setFont(&FreeSans9pt7b);
-    display.setFont();
-    display.setTextColor(GxEPD_BLACK);
-    display.setRotation(1);
-    
-    display.setPartialWindow(0, 110, 296, 17);
-    display.firstPage();
-    do {
-        display.drawRoundRect(1, 110, 294, 17, 4, GxEPD_BLACK);
-        display.setCursor(8, 116);
-        display.print(buf01);
-        display.drawFastVLine(60, 110, 17, GxEPD_BLACK);
-        display.drawFastVLine(85, 110, 17, GxEPD_BLACK);
-        display.drawFastVLine(140, 110, 17, GxEPD_BLACK);
-        display.drawFastVLine(195, 110, 17, GxEPD_BLACK);    
-        display.drawFastVLine(235, 110, 17, GxEPD_BLACK);    
+    for(int x = 0; x < LED_COUNT; x++) {
+        strip.setPixelColor(x, NEO_WHITE); 
+        strip.show();
+        delay(delayTime);
     }
-    while (display.nextPage());
-    Serial.println(buf01);
+    for(int x = 0; x < LED_COUNT; x++) {
+        strip.setPixelColor(x, NEO_LIGHTBLUE); 
+        strip.show();
+        delay(delayTime);
+    }
+    for(int x = 0; x < LED_COUNT; x++) {
+        strip.setPixelColor(x, NEO_CYAN);
+        strip.show();
+        delay(delayTime);
+    }
+    for(int x = 0; x < LED_COUNT; x++) {
+        strip.setPixelColor(x, NEO_BLUE); 
+        strip.show();
+        delay(delayTime);
+    }
+    for(int x = 0; x < LED_COUNT; x++) {
+        strip.setPixelColor(x, NEO_OFF); 
+        strip.show();
+        delay(delayTime);
+    }
 }
 
+void timeStatus() {
+    Serial.println("\nDS3231SN Paramters -------------------------------------------------\n");
+    char tF[2][10]   = {"FALSE", "TRUE"};
+    DateTime now = rtc.now();                               // get current time from RTC
+    Serial.print("lostPower()\t\t");            
+    Serial.println(tF[rtc.lostPower()]);
+    Serial.print("readSqwPinMode()\t");         
+    Serial.println(rtc.readSqwPinMode());
+    Serial.print("isEnabled32K()\t\t");         
+    Serial.println(tF[rtc.isEnabled32K()]);
+    Serial.print("chip temperature\t");         
+    Serial.print(rtc.getTemperature());
+    Serial.print("°C\t");
+    Serial.print((rtc.getTemperature() * 1.8) + 32);        // (0°C × 9/5) + 32 = 32°F
+    Serial.println("°F");
 
-// ------------  DISPLAY BATTERY SPRITE  ------------ //
-void batterySprite() {
-    Serial.print("batterySprite\t");
-
-    #define VBATPIN         A6
+    Serial.print("current time\t\t");
+    char curr_date_buf[] = "DDD  MM/DD/YY ";
+    Serial.print(now.toString(curr_date_buf));
+    char curr_time_buf[] = "hh:mm:ss AP ";    
+    Serial.print(now.toString(curr_time_buf));
+    Serial.println(LOC[isLDT(now)]);                        // render LST ot LDT
     
+    Serial.print("uptime chronometer ");
+    char chrono_buf[40];
+    sprintf(chrono_buf, "%d:%02d:%02d", chrono.getHours(), 
+            chrono.getMinutes(), chrono.getSeconds());
+    Serial.println(chrono_buf);
+
+    Serial.print("elapsed since midnight 1/1/1970\t"); 
+    Serial.print(now.unixtime());
+    Serial.print(" seconds, ");                
+    Serial.print(now.unixtime() / 86400L);
+    Serial.print(" days");                   
+
+    Serial.println("\n--------------------------------------------------------------------\n");
+}
+void strikeStatus() {
+    Serial.println("\nAS3935 Paramters ---------------------------------------------------\n");
+
+    //strike.resetSettings();
+    //strike.clearStatistics();
+    //strike.powerDown();
+
+    Serial.println("PARAMETER\t\t\t\t\SETTING\t\tREADING");  
+
+    strike.maskDisturber(AS3935_MASK_DISTURBER);
+    Serial.print("Disturbers Masked? ( yes no[d] )\t");
+    Serial.print(falseTrue[AS3935_MASK_DISTURBER]);
+    Serial.print("\t\t");
+    Serial.println(falseTrue[strike.readMaskDisturber()]);
+
+    strike.setIndoorOutdoor(AS3935_INDOOR_OUTDOOR);
+    Serial.print("IndoorOutdoor( out 0x12 [d], in 0xE )\t0x");
+    Serial.print(AS3935_INDOOR_OUTDOOR, HEX);
+    Serial.print("\t\t");
+    if (strike.readIndoorOutdoor() == 0xE) inOut = 0;                   // outdoor
+    else inOut = 1;                                                     // indoor
+    Serial.println(indoorOutdoor[inOut]);
+
+    strike.setNoiseLevel(AS3935_NOISE_LEVEL);
+    Serial.print("NoiseLevel( 1 - 7 2[d] )\t\t");
+    Serial.print(AS3935_NOISE_LEVEL);
+    Serial.print("\t\t");
+    Serial.println(strike.readNoiseLevel());
+
+    strike.watchdogThreshold(AS3935_WATCHDOG_THRESHOLD);
+    Serial.print("WatchdogThreshold( 1 - 10 2[d] )\t");
+    Serial.print(AS3935_WATCHDOG_THRESHOLD);
+    Serial.print("\t\t");
+    Serial.println(strike.readWatchdogThreshold());
+
+    strike.spikeRejection(AS3935_SPIKE_REJECTION);
+    Serial.print("SpikeRejection( 1 - 11 2[d] )\t\t");
+    Serial.print(AS3935_SPIKE_REJECTION);
+    Serial.print("\t\t");
+    Serial.println(strike.readSpikeRejection());
+
+    strike.lightningThreshold(AS3935_LIGHTENING_THRESHOLD);
+    Serial.print("LightningThreshold( 1, 5, 9, 26 1[d] )\t");
+    Serial.print(AS3935_LIGHTENING_THRESHOLD);
+    Serial.print("\t\t");
+    Serial.println(strike.readLightningThreshold());
+    Serial.print("\n----------------------------------------------------------------------\n");
+}
+void batteryStatus() {
+    Serial.print("batterySprite\t");
+    #define VBATPIN         A6
     float batteryVolts = analogRead(VBATPIN);
     batteryVolts *= 2;
     batteryVolts *= 3.3;
     batteryVolts /= 1024;
-
+    char buf0[15];
+    sprintf(buf0, "batt %d.%02dv", (int)batteryVolts, (int)(batteryVolts*100)%100);
+    Serial.println(buf0);
+    /*  // ------------  Battery charge sprite display ------------
     #define BATTTEXT_STARTX     200                 //  Battery Text X Position
     #define BATTTEXT_STARTY     1                   //  Battery Text Y Position
     #define BATTICON_STARTX     265                 //  Battery Icon X Position
     #define BATTICON_STARTY     1                   //  Battery Icon X Position
     #define BATTICON_WIDTH      30                  //  Battery Icon Width
     #define BATTICON_BARWIDTH3  ((BATTICON_WIDTH - 6) / 3)  //  Bar Width
-
-    char buf0[15];
-    sprintf(buf0, "batt %d.%02dv", (int)batteryVolts, 
-                                   (int)(batteryVolts*100)%100);
-
     display.setFont();
     display.setTextColor(GxEPD_BLACK);
     display.setRotation(1);
-
-    display.setPartialWindow(/*x start*/ 200, /*y start*/ 0, 
-                             /*width*/ 96, /*height*/ 16);
+    display.setPartialWindow(200, 0, 96, 16);       // x start y start width height
     display.firstPage();
-    
     do {    
         display.setCursor(BATTTEXT_STARTX, BATTTEXT_STARTY);
         display.print(buf0);
-
         display.drawLine( BATTICON_STARTX + 1, BATTICON_STARTY,     
                           BATTICON_STARTX +    BATTICON_WIDTH - 4,  
                           BATTICON_STARTY,     GxEPD_BLACK);
@@ -513,7 +714,6 @@ void batterySprite() {
                           BATTICON_STARTY + 5, GxEPD_BLACK);
         display.drawPixel(BATTICON_STARTX +    BATTICON_WIDTH - 3, 
                           BATTICON_STARTY + 6, GxEPD_BLACK);
-    
         if (batteryVolts > 4.26F) 
             display.fillRect(BATTICON_STARTX + 2, BATTICON_STARTY + 2, 
                              BATTICON_BARWIDTH3 * 3, 3, GxEPD_WHITE);
@@ -538,48 +738,20 @@ void batterySprite() {
         }
     }
     while (display.nextPage());
-    Serial.println(buf0);
+    */
 }
-
-
-// ------------  STARTUP MELODY  ------------ //
 void startupMelody() {
-    Serial.print("startupMelody\t");
-    
+    #define TONE_PIN    4
+    #include "toneNotes.h"    
     int melody[]        = { NOTE_C4, NOTE_G3, NOTE_G3, NOTE_A3, 
                             NOTE_G3, 0,       NOTE_B3, NOTE_C4 };
-
-    int noteDurations[] = { 4, 8, 8, 4, 4, 4, 4, 4 };    // 1/4 & 1/8th notes
+    int noteDurations[] = { 4, 8, 8, 4, 4, 4, 4, 4 };               // 1/4 & 1/8th notes
     for (int thisNote = 0; thisNote < 8; thisNote++) {
         int noteDuration = 1000 / noteDurations[thisNote];
-        tone(TONE_PIN, melody[thisNote], noteDuration);
+        // tone(TONE_PIN, melody[thisNote], noteDuration);
         int pauseBetweenNotes = noteDuration * 1.30;
         delay(pauseBetweenNotes);
         Serial.print(thisNote);
         noTone(TONE_PIN);
     }
-    Serial.println("done");
-}
-
-
-// ------------  STARTUP MELODY  ------------ //
-void introScreen() {
-    Serial.println("introScreen()");
-
-    display.setFont(&FreeSans12pt7b);
-    display.setRotation(1);
-    display.fillScreen(GxEPD_WHITE);
-    display.setTextColor(GxEPD_RED);
-    int16_t tbx, tby; uint16_t tbw, tbh;
-    const char Start[] = "Strike Detector";
-    display.getTextBounds(Start, 0, 0, &tbx, &tby, &tbw, &tbh);
-    uint16_t x = ((display.width() - tbw) / 2) - tbx;
-    uint16_t y = ((display.height() - tbh) / 2) - tby;
-    display.setFullWindow();
-    display.firstPage();
-    do {
-        display.setCursor(x, y);
-        display.print(Start);
-    }
-    while (display.nextPage());
 }

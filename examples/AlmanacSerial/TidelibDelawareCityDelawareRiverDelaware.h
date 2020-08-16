@@ -1,6 +1,6 @@
-/*  TidelibClearwaterBeachGulfOfMexicoFlorida.h 
+/*  TidelibDelawareCityDelawareRiverDelaware.h 
   A library for calculating the current tide height at 
-   Clearwater Beach, Gulf Of Mexico, Florida , NOAA station ID number  8726724 
+   Delaware City, Delaware River, Delaware , NOAA station ID number  8551762 
   Luke Miller, 2019-02-02 
   Compiled under Arduino 1.8.8
   https://github.com/millerlp/Tide_calculator
@@ -17,11 +17,11 @@
  against the relevant NOAA tide predictions online.
 */ 
  
-#ifndef  TidelibClearwaterBeachGulfOfMexicoFlorida_h 
-#define  TidelibClearwaterBeachGulfOfMexicoFlorida_h 
-#include <Arduino.h>
-#include <avr/pgmspace.h>
-#include <Wire.h>
+#ifndef  TidelibDelawareCityDelawareRiverDelaware_h 
+#define  TidelibDelawareCityDelawareRiverDelaware_h 
+// #include <Arduino.h>
+// #include <avr/pgmspace.h>
+// #include <Wire.h>
 #include "RTClib.h" // https://github.com/millerlp/RTClib
 
 class TideCalc {

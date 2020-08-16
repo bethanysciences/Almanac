@@ -1,0 +1,5 @@
+{
+    "sketch": "Almanac.ino",
+    "board": "arduino:mbed:nano33ble",
+    "programmer": "AVRISP mkII"
+}
