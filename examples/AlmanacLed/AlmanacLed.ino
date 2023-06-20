@@ -101,7 +101,6 @@ float results;
  *******************|*******************|*******************|******************/
 
 void setup() {
-`1   
     highDisplay.init();                     // initialize event displays
     lowDisplay.init();
     riseDisplay.init();
@@ -136,7 +135,7 @@ void loop() {
     getTideEvents();
     getSunEvents();
     
-    for(int x = 1; x <= 30; x++) {          // flas colon as activity sprite
+    for(int x = 1; x <= 30; x++) {          // flash colon as activity sprite
         clockDisplay.drawColon(true);
         clockDisplay.writeDisplay();
         delay(1000);

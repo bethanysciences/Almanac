@@ -1,0 +1,139 @@
+   [1]<- Previous [2]Contents
+
+Icon News
+
+XTide 2.15.5 (libxtide.so.1.0.4) 2022-05-11
+
+   XTide 2.15.5 restored compatibility with recent gpsd.  XTide 2.15.4
+   fixed a FTB with libXaw 1.0.14 and assorted minor issues.  Get the
+   latest from [3]https://flaterco.com/xtide/files.html and see the
+   [4]changelog for details.
+
+Data refresh 2022-01-09
+
+   The data refresh available from
+   [5]https://flaterco.com/xtide/files.html#harmonicsfiles includes new
+   tide stations for Puerto Rico and the Virgin Islands.
+
+   A corresponding update of the harmonic constants management package is
+   available from [6]https://flaterco.com/xtide/files.html#experts.
+
+ftp is dead
+
+   The archive is at [7]https://flaterco.com/files/xtide/.  Old links
+   pointing to ftp://ftp.flaterco.com/xtide/... should be redirected to
+   https://flaterco.com/files/xtide/....
+
+End of maintenance for non-free data
+
+   For [8]various reasons, I have ended maintenance of the non-free data
+   set.  Anyone interested in generating new harmonic constants from
+   published data can find information and a list of data sources [9]here.
+
+Mailing list
+
+   There is an announce-only mailing list to which I send notices of each
+   update to XTide or the harmonics data.  You can subscribe or read the
+   archives at
+   [10]https://pairlist10.pair.net/mailman/listinfo/xtide-announce.
+
+   Please note:  If an announcement to you gets bounced by your mail
+   server, you fall off the list.  Some long-time contributors have fallen
+   off because, unbeknownst to them, their ISPs subscribed to a spam
+   blackholing service that blackholed all pair.com-hosted domains after
+   one of them sent out spam.
+
+To do list
+
+   XTide
+     * Support [11]QGIS integration as a substitute for the builtin
+       location chooser.
+     * Support m/s as a unit for currents.  NOAA default is now cm/s.
+     * If libxtide is changed, consider merging some accommodations from
+       XTideMac.
+          + Opting out of LibPNG, RGBGraph, Settings, and codeset support.
+          + Compiler was opinionated about character encoding and int
+            types.
+          + Configure for dirent.h, syslog.h.
+     * Purge antique portability workarounds.
+     * Make xttpd use https.
+     * Support lookup by station ID instead of only name.
+     * The XML parser should be bundled under the libxtide namespace but
+       isn't.
+
+   Major things to do in XTide 3 if life turns out not to be too short
+   after all:
+     * Support minor axes for currents; yield speed and direction at any
+       time; plot as a cylinder.
+     * Find a way to put an end to the infinite number of customization
+       settings for graph mode, such as by dumping ALL of the data,
+       metadata, and events to a single-file format that an external
+       graphing app will read.
+     * Renovate programming practices again (exceptions, checked and const
+       operations, strings).
+     * On exceptions:  get the application-specific error messages OUT of
+       libxtide.
+     * Move from Latin-1 to UTF-8 (requires libtcd revision).
+     * Harmonize the globe location chooser with the way that Google Earth
+       operates.  Use OpenGL of course.
+     * Support Wayland in non-X11 mode.
+     * Hydraulic current support is obsolete.
+
+   harmbase2
+
+   All the cheap and nasty reverse geocoding for the purpose of improving
+   station descriptions is stupid and should be punted to [12]QGIS.
+
+   harmgen
+
+   It should be possible to [13]link directly with liboctave to avoid the
+   very inefficient conversion of input data from binary to text and back
+   again that currently is done.  However, this would be fixing something
+   that is not broken, and is neither important nor urgent.
+
+   libtcd
+
+   Purge antique portability workarounds from configure.ac.  Always just
+   include stdint not inttypes.
+
+   In signed_bit_unpack, extend_mask << numbits uses undefined behavior.
+
+   In the documentation section on inference, cite NOAA SP NOS CO-OPS 3
+   Sec. 4.2.3 explaining how bogus it is.
+
+   Things to do in the next major revision, if there ever is one:
+     * Purge COMPAT114 code and documentation.
+     * UTF-8.
+     * Move station ID to header.
+     * Add header field to flag tides versus currents.
+     * Add depth field for currents.
+     * Support minor axes for currents.
+     * Get rid of internal state; fix inability to have more than one
+       database open.
+     * Remove gratuitous complexity in the encoding of speeds, equilibrium
+       arguments, and node factors; make speeds 32-bit unsigned with no
+       offset.
+     * Possibly permit node factors to be specified for intervals shorter
+       than 1 year and/or support apps that use libcongen to generate the
+       node factors themselves.
+     __________________________________________________________________
+
+   [14]<- Previous [15]Contents
+
+References
+
+   1. https://flaterco.com/xtide/changelog.html
+   2. https://flaterco.com/xtide/xtide.html#contents
+   3. https://flaterco.com/xtide/files.html
+   4. https://flaterco.com/xtide/changelog.html
+   5. https://flaterco.com/xtide/files.html#harmonicsfiles
+   6. https://flaterco.com/xtide/files.html#experts
+   7. https://flaterco.com/files/xtide/
+   8. https://flaterco.com/xtide/faq.html#renaissance
+   9. https://flaterco.com/xtide/harmonics.html#harmgen
+  10. https://pairlist10.pair.net/mailman/listinfo/xtide-announce
+  11. https://qgis.org/en/site/
+  12. https://qgis.org/en/site/
+  13. https://www.gnu.org/software/octave/doc/interpreter/Standalone-Programs.html
+  14. https://flaterco.com/xtide/changelog.html
+  15. https://flaterco.com/xtide/xtide.html#contents
