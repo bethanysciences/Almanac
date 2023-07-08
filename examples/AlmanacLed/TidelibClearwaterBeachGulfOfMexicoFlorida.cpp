@@ -3,7 +3,7 @@
 
 unsigned int YearIndx = 0;          // Used to index rows in the Equilarg/Nodefactor arrays
 float currHours = 0;                // Elapsed hours since start of year
-const int adjustGMT = 4;            // Time zone adjustment to get time in GMT.
+const int adjustGMT = 5;            // Time zone adjustment to get time in GMT.
 
 /* Initialize harmonic constituent array each holding 37 values for the tide site extracted using R scripts:
     tide_harmonics_parse.R and tide_harmonics_library_generator.R
